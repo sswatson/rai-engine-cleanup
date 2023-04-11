@@ -35,9 +35,9 @@ async function cleanupEngines() {
   });
   const distinctEngines = [...(new Set(engines.map((engine: Engine) => engine.name)))];
   const now = Date.now();
-  console.log(`${now} ${distinctEngines.length} provisioned engines: `, distinctEngines);
+  console.log(`${new Date(now)} ${distinctEngines.length} provisioned engines: `, distinctEngines.join(", "));
   for (let engine of distinctEngines) {
-    if (engine === "raidocs-parser-engine") continue;
+    if (engine === "raidocs-parser-engine"  || engine === "raidocs-team") continue;
     // last used less than six hours ago:
     const lastUsedTime = await lastUsed(engine);
     const hoursAgo = (now - lastUsedTime) / (1000 * 60 * 60);
