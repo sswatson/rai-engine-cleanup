@@ -16,28 +16,36 @@ async function cleanupEngines() {
   };
   const client = new Client(config);
 
-  const transactions = await client.listTransactions();
-  const lastUsed: {[engineName: string]: number} = {};
-  for (let transaction of transactions) {
-    lastUsed[transaction.engine_name] = Math.max(
-      (lastUsed[transaction.engine_name] || 0),
-      transaction.created_on || 0
-    );
+  async function lastUsed(engine_name: string) {
+    const transactions = await client.listTransactions({
+      engine_name
+    });
+    let lastUsed: number = 0;
+    for (let transaction of transactions) {
+      lastUsed = Math.max(
+        (lastUsed || 0),
+        transaction.created_on || 0
+      );
+    }
+    return lastUsed;
   }
   
   const engines = await client.listEngines({
     state: EngineState.PROVISIONED,
   });
-  const distinctEngines = [...(new Set(engines.map((engine: Engine) => engine.name)))] 
+  const distinctEngines = [...(new Set(engines.map((engine: Engine) => engine.name)))];
   const now = Date.now();
+  console.log(`${now} ${distinctEngines.length} provisioned engines: `, distinctEngines);
   for (let engine of distinctEngines) {
+    if (engine === "raidocs-parser-engine") continue;
     // last used less than six hours ago:
-    if (engine in lastUsed && lastUsed[engine] > now - 1000 * 60 * 60 * 6) {
-      continue;
-    }
-    console.log(`Would delete engine ${engine}`);
-    //await client.deleteEngine(engine);
+    const lastUsedTime = await lastUsed(engine);
+    const hoursAgo = (now - lastUsedTime) / (1000 * 60 * 60);
+    if (hoursAgo < 24) continue;
+    console.log(`Deleting engine ${engine}`);
+    await client.deleteEngine(engine);
   }
 }
 
+// every hour:
 cron.schedule(`0 * * * *`, cleanupEngines);
